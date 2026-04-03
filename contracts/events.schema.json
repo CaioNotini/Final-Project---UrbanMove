@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UrbanMove",
+  "type": "object",
+  "oneOf": [
+    {
+      "title": "VehicleUpdate",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "vehicle_id",
+        "vehicle_type",
+        "timestamp",
+        "x",
+        "y",
+        "speed_kmh",
+        "status"
+      ],
+      "properties": {
+        "type": { "const": "vehicle_update" },
+        "vehicle_id": { "type": "string", "minLength": 1 },
+        "vehicle_type": {
+          "type": "string",
+          "enum": ["car", "bus", "emergency"]
+        },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "x": { "type": "number", "minimum": 0 },
+        "y": { "type": "number", "minimum": 0 },
+        "speed_kmh": { "type": "number", "minimum": 0 },
+        "status": {
+          "type": "string",
+          "enum": ["moving", "parked", "stopped", "arrived", "accident"]
+        },
+        "segment_id": { "type": ["string", "null"] },
+        "current_node": { "type": ["integer", "null"], "minimum": 0 },
+        "destination_node": { "type": ["integer", "null"], "minimum": 0 },
+        "route_stops": {
+          "type": ["array", "null"],
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "current_target_stop": { "type": ["integer", "null"], "minimum": 0 },
+        "line_id": { "type": ["string", "null"] },
+        "remaining_ticks": { "type": ["integer", "null"], "minimum": 0 },
+        "next_node": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    {
+      "title": "TrafficUpdate",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "segment_id",
+        "from_node",
+        "to_node",
+        "traffic_level",
+        "traffic_multiplier",
+        "timestamp"
+      ],
+      "properties": {
+        "type": { "const": "traffic_update" },
+        "segment_id": { "type": "string", "minLength": 1 },
+        "from_node": { "type": "integer", "minimum": 0 },
+        "to_node": { "type": "integer", "minimum": 0 },
+        "traffic_level": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "traffic_multiplier": { "type": "number", "exclusiveMinimum": 0 },
+        "weight": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    },
+    {
+      "title": "Incident",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "incident_id",
+        "segment_id",
+        "timestamp",
+        "severity"
+      ],
+      "properties": {
+        "type": { "const": "incident_reported" },
+        "incident_id": { "type": "string", "minLength": 1 },
+        "segment_id": { "type": "string", "minLength": 1 },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "severity": { "type": "string", "enum": ["low", "medium", "high"] }
+      }
+    }
+  ]
+}

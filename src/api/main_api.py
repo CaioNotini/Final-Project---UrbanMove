@@ -1,0 +1,13 @@
+from fastapi import FastAPI
+from src.api.vehicles_api import router as vehicles_router
+from src.api.traffic_api import router as traffic_router
+
+app = FastAPI(title="UrbanMove API")
+
+app.include_router(vehicles_router)
+app.include_router(traffic_router)
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
