@@ -6,13 +6,13 @@ from dotenv import load_dotenv
 import requests
 import os
 
-from simulator.grid import create_city_graph
-from simulator.run_sim import *
+from src.simulator.grid import create_city_graph
+from src.simulator.run_sim import *
 from db.grid_db import create_graph, read_graph, load_graph
 from db.vehicle_db import *
 from api.api import send_traffic_events, send_reroute_events, send_vehicle_events
 
-CARS = 5
+CARS = 6
 BUSES = 2
 NODES_X = 10
 NODES_Y = 10
