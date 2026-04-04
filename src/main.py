@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import json
 import random
-from dotenv import load_dotenv
 import requests
-import os
+
 
 from src.simulator.grid import create_city_graph
 from src.simulator.run_sim import *
@@ -19,8 +18,7 @@ NODES_Y = 10
 TICKS = 10
 TRAFIC_PROBABILITY = 0.02
 
-load_dotenv()
-API_URL = os.getenv("API_URL")
+
 
 
 
@@ -149,7 +147,6 @@ def main():
             send_vehicle_events(vehicle_events)
 
     print("Simulation finished.")
-    print("API_URL usada:", API_URL)
 
 if __name__ == "__main__":
     main()

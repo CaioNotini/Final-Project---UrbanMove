@@ -136,9 +136,9 @@ def read_vehicles(graph: nx.DiGraph, algorithm: str = "astar") -> Tuple[List[Car
                 current_segment_id=segment_id,
                 status=status,
                 route_stops=route_stops,
-                current_stop_index=current_stop_index,
+                #current_stop_index=current_stop_index,
                 line_id=line_id,
-                direction=direction,
+                #direction=direction,
                 vehicle_type="bus",
             )
 
