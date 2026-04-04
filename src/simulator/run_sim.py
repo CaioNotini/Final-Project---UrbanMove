@@ -235,7 +235,10 @@ def emit_vehicle_update(graph: nx.DiGraph, v) -> dict:
     elif v.vehicle_type == "bus":
         event["route_stops"] = v.route_stops
         event["current_target_stop"] = v.current_target_stop()
+        event["current_stop_index"] = v.current_stop_index
+        event["direction"] = v.direction
         event["line_id"] = v.line_id
+        event["segment_id"] = v.current_segment_id
 
     return event
 
