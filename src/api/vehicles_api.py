@@ -4,8 +4,7 @@ import traceback
 from pydantic import BaseModel
 from src.db.grid_db import load_graph
 from src.simulator.run_sim import serialize_fleet, spawn_buses, spawn_cars
-from src.db.vehicle_db import create_vehicle_event, create_vehicle_states, create_vehicles, read_vehicle_state_by_id, read_vehicle_states, read_vehicles, update_vehicle_current_state, create_reroute_event
-
+from src.db.vehicle_db import (create_vehicle_event,create_vehicle_states,create_vehicles, read_vehicle_state_by_id, read_vehicle_states, read_vehicles, update_vehicle_current_state, create_reroute_event,)
 router = APIRouter(prefix="/vehicles", tags=["vehicles"])
 
 
