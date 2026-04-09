@@ -4,7 +4,7 @@ import traceback
 from pydantic.v1 import BaseModel
 from db.grid_db import load_graph
 from simulator.run_sim import serialize_fleet, spawn_buses, spawn_cars
-from src.db.vehicle_db import create_vehicle_event, create_vehicle_states, create_vehicles, read_vehicles, update_vehicle_current_state, create_reroute_event
+from src.db.vehicle_db import create_vehicle_event, create_vehicle_states, create_vehicles, read_vehicle_state_by_id, read_vehicle_states, read_vehicles, update_vehicle_current_state, create_reroute_event
 
 router = APIRouter(prefix="/vehicles", tags=["vehicles"])
 
@@ -14,6 +14,9 @@ class FleetConfig(BaseModel):
     num_buses: int
     algorithm: str = "astar"
 
+
+
+################################################   Events   #############################################################################
 
 @router.post("/events")
 def vehicle_events(events: list[dict]):
@@ -29,6 +32,10 @@ def vehicle_events(events: list[dict]):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
+################################################   Reroutes   #############################################################################
+
 @router.post("/reroutes")
 def reroute_events(events: list[dict]):
     try:
@@ -38,6 +45,9 @@ def reroute_events(events: list[dict]):
         raise HTTPException(status_code=500, detail=str(e))
     
 
+
+
+################################################   Fleet   #############################################################################
 
 @router.post("/fleet")
 def get_or_create_fleet(config: FleetConfig):
@@ -76,6 +86,36 @@ def get_or_create_fleet(config: FleetConfig):
 
         return serialize_fleet(cars, buses)
 
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+
+    ################################################   GET Vehicles   #############################################################################
+
+@router.get("")
+def get_vehicles():
+    try:
+        vehicles = read_vehicle_states()
+        return {"vehicles": vehicles}
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@router.get("/{vehicle_id}")
+def get_vehicle(vehicle_id: str):
+    try:
+        vehicle = read_vehicle_state_by_id(vehicle_id)
+
+        if not vehicle:
+            raise HTTPException(status_code=404, detail="Vehicle not found")
+
+        return vehicle
+
+    except HTTPException:
+        raise
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

@@ -157,7 +157,113 @@ def read_vehicles(graph: nx.DiGraph, algorithm: str = "astar") -> Tuple[List[Car
 
     return cars, buses   
 
+def read_vehicle_states():
+    conn = get_connection()
+    cur = conn.cursor()
 
+    cur.execute("""
+        SELECT
+            v.vehicle_id,
+            v.vehicle_type,
+            v.line_id,
+            s.current_node,
+            s.segment_id,
+            s.destination_node,
+            s.status,
+            s.x,
+            s.y,
+            s.speed_kmh,
+            s.current_target_stop,
+            s.route_stops,
+            s.current_stop_index,
+            s.direction,
+            s.updated_at
+        FROM vehicles v
+        JOIN vehicle_current_state s
+            ON v.vehicle_id = s.vehicle_id
+        ORDER BY v.vehicle_id
+    """)
+
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    vehicles = []
+
+    for r in rows:
+        vehicles.append({
+            "vehicle_id": r[0],
+            "vehicle_type": r[1],
+            "line_id": r[2],
+            "current_node": r[3],
+            "segment_id": r[4],
+            "destination_node": r[5],
+            "status": r[6],
+            "x": r[7],
+            "y": r[8],
+            "speed_kmh": r[9],
+            "current_target_stop": r[10],
+            "route_stops": r[11],
+            "current_stop_index": r[12],
+            "direction": r[13],
+            "updated_at": r[14].isoformat() if r[14] else None,
+        })
+
+    return vehicles
+
+def read_vehicle_state_by_id(vehicle_id: str):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            v.vehicle_id,
+            v.vehicle_type,
+            v.line_id,
+            s.current_node,
+            s.segment_id,
+            s.destination_node,
+            s.status,
+            s.x,
+            s.y,
+            s.speed_kmh,
+            s.current_target_stop,
+            s.route_stops,
+            s.current_stop_index,
+            s.direction,
+            s.updated_at
+        FROM vehicles v
+        JOIN vehicle_current_state s
+            ON v.vehicle_id = s.vehicle_id
+        WHERE v.vehicle_id = %s
+    """, (vehicle_id,))
+
+    row = cur.fetchone()
+
+    cur.close()
+    conn.close()
+
+    if not row:
+        return None
+
+    return {
+        "vehicle_id": row[0],
+        "vehicle_type": row[1],
+        "line_id": row[2],
+        "current_node": row[3],
+        "segment_id": row[4],
+        "destination_node": row[5],
+        "status": row[6],
+        "x": row[7],
+        "y": row[8],
+        "speed_kmh": row[9],
+        "current_target_stop": row[10],
+        "route_stops": row[11],
+        "current_stop_index": row[12],
+        "direction": row[13],
+        "updated_at": row[14].isoformat() if row[14] else None,
+    }
 
 
 #################################################################################################################
@@ -392,3 +498,5 @@ def create_reroute_event(events: list[dict]):
     conn.commit()
     cur.close()
     conn.close()
+
+
