@@ -9,7 +9,7 @@ from src.simulator.grid import create_city_graph
 from src.simulator.run_sim import *
 from src.db.grid_db import create_graph, read_graph, load_graph
 from src.db.vehicle_db import *
-from src.api.api import send_traffic_events, send_reroute_events, send_vehicle_events
+from src.api.api import get_graph, get_or_create_fleet, send_traffic_events, send_reroute_events, send_vehicle_events
 
 CARS = 6
 BUSES = 2
@@ -17,6 +17,7 @@ NODES_X = 10
 NODES_Y = 10
 TICKS = 10
 TRAFIC_PROBABILITY = 0.02
+ALGORITHM = "astar"  # or "dijkstra"
 
 
 
@@ -28,52 +29,11 @@ def main():
     width, height = NODES_X, NODES_Y
 
     # ---------------- GRAPH ----------------
-    if read_graph():
-        print("Loading graph from database")
-        graph = load_graph()
-    else:
-        print("Creating graph and saving to database")
-        graph = create_city_graph(
-            width, height,
-            default_speed=50.0,
-            bidirectional=True
-        )
-        create_graph(graph)
+    graph = get_graph(width, height)
 
     # ---------------- VEHICLES ----------------
-    num_cars = CARS
-    num_buses = BUSES
-    algo = "astar"
-
-    cars, buses = read_vehicles(graph, algorithm=algo)
-
-    missing_cars = max(0, num_cars - len(cars))
-    missing_buses = max(0, num_buses - len(buses))
-
-    if missing_cars == 0 and missing_buses == 0:
-        print(f"Loaded {len(cars)} cars and {len(buses)} buses from database")
-    else:
-        print("Creating fleet")
-
-        new_cars = spawn_cars(
-            graph=graph,
-            num_cars=missing_cars,
-            algorithm=algo,
-            start_index=len(cars),
-        )
-
-        new_buses = spawn_buses(
-            graph=graph,
-            num_buses=missing_buses,
-            algorithm=algo,
-            start_index=len(buses),
-        )
-
-        if new_cars or new_buses:
-            create_vehicles(new_cars + new_buses)
-            create_vehicle_states(graph, new_cars + new_buses)
-
-        cars, buses = read_vehicles(graph, algorithm=algo)
+    fleet_data = get_or_create_fleet(CARS, BUSES, ALGORITHM)
+    cars, buses = parse_fleet(fleet_data)
 
   # ---------------- SIMULATION LOOP ----------------
     for tick in range(TICKS):
@@ -92,7 +52,7 @@ def main():
 
         # 2) Move buses
         for b in buses:
-            step_bus(graph, b, algorithm=algo)
+            step_bus(graph, b, algorithm=ALGORITHM)
 
             event = emit_vehicle_update(graph, b)
             vehicle_events.append(event)
@@ -105,7 +65,7 @@ def main():
                 c.parked_tickets -= 1
 
                 if c.parked_tickets <= 0:
-                    restart_path(graph, c, algorithm=algo)
+                    restart_path(graph, c, algorithm=ALGORITHM)
 
                     event = emit_vehicle_update(graph, c)
                     vehicle_events.append(event)
@@ -114,7 +74,7 @@ def main():
 
             # -------- REROUTING LOGIC --------
             if should_reroute_car(graph, c):
-                reroute_event = reroute_car(graph, c, algorithm=algo)
+                reroute_event = reroute_car(graph, c, algorithm=ALGORITHM)
 
                 if reroute_event:
                     reroute_events_to_send.append(reroute_event)

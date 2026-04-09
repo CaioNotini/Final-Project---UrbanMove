@@ -109,6 +109,81 @@ def spawn_buses(graph: nx.DiGraph, num_buses: int, algorithm: str = "astar", sta
 
     return buses
 
+def serialize_vehicle(v):
+    base = {
+        "vehicle_id": v.vehicle_id,
+        "current_node": v.current_node,
+        "path_nodes": v.path_nodes,
+        "path_index": v.path_index,
+        "speed_kmh": v.speed_kmh,
+        "current_segment_id": v.current_segment_id,
+        "status": v.status,
+        "vehicle_type": v.vehicle_type,
+        "remaining_ticks": v.remaining_ticks,
+        "next_node": v.next_node,
+    }
+
+    # Car-specific
+    if v.vehicle_type == "car":
+        base.update({
+            "destination_node": v.destination_node,
+            "parked_tickets": v.parked_tickets,
+        })
+
+    # Bus-specific
+    elif v.vehicle_type == "bus":
+        base.update({
+            "route_stops": v.route_stops,
+            "current_stop_index": v.current_stop_index,
+            "line_id": v.line_id,
+            "direction": v.direction,
+        })
+
+    return base
+
+def serialize_fleet(cars, buses):
+    return {
+        "cars": [serialize_vehicle(c) for c in cars],
+        "buses": [serialize_vehicle(b) for b in buses],
+    }
+
+def parse_fleet(data):
+    cars = []
+    buses = []
+
+    for c in data["cars"]:
+        cars.append(Car(
+            vehicle_id=c["vehicle_id"],
+            current_node=c["current_node"],
+            path_nodes=c["path_nodes"],
+            path_index=c["path_index"],
+            speed_kmh=c["speed_kmh"],
+            current_segment_id=c["current_segment_id"],
+            status=c["status"],
+            remaining_ticks=c["remaining_ticks"],
+            next_node=c["next_node"],
+            destination_node=c["destination_node"],
+            parked_tickets=c["parked_tickets"],
+        ))
+
+    for b in data["buses"]:
+        buses.append(Bus(
+            vehicle_id=b["vehicle_id"],
+            current_node=b["current_node"],
+            path_nodes=b["path_nodes"],
+            path_index=b["path_index"],
+            speed_kmh=b["speed_kmh"],
+            current_segment_id=b["current_segment_id"],
+            status=b["status"],
+            remaining_ticks=b["remaining_ticks"],
+            next_node=b["next_node"],
+            route_stops=b["route_stops"],
+            current_stop_index=b["current_stop_index"],
+            line_id=b["line_id"],
+            direction=b["direction"],
+        ))
+
+    return cars, buses
 
 ################################################   Moving Vehicles   #############################################################################
 
