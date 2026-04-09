@@ -43,3 +43,35 @@ def create_traffic_event(events: list[dict]) -> None:
     conn.commit()
     cur.close()
     conn.close()
+
+
+def read_traffic():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            segment_id,
+            traffic_level,
+            traffic_multiplier,
+            updated_at
+        FROM traffic_events
+        ORDER BY updated_at DESC
+    """)
+
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    traffic = []
+
+    for r in rows:
+        traffic.append({
+            "segment_id": r[0],
+            "traffic_level": r[1],
+            "traffic_multiplier": r[2],
+            "updated_at": r[3].isoformat() if r[3] else None,
+        })
+
+    return traffic

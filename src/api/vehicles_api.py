@@ -4,7 +4,7 @@ import traceback
 from pydantic import BaseModel
 from src.db.grid_db import load_graph
 from src.simulator.run_sim import serialize_fleet, spawn_buses, spawn_cars
-from src.db.vehicle_db import (create_vehicle_event,create_vehicle_states,create_vehicles, read_vehicle_state_by_id, read_vehicle_states, read_vehicles, update_vehicle_current_state, create_reroute_event,)
+from src.db.vehicle_db import (create_vehicle_event,create_vehicle_states,create_vehicles, read_bus_lines, read_vehicle_state_by_id, read_vehicle_states, read_vehicles, update_vehicle_current_state, create_reroute_event,)
 router = APIRouter(prefix="/vehicles", tags=["vehicles"])
 
 
@@ -117,4 +117,12 @@ def get_vehicle(vehicle_id: str):
         raise
     except Exception as e:
         traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/bus-lines")
+def get_bus_lines():
+    try:
+        lines = read_bus_lines()
+        return {"bus_lines": lines}
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

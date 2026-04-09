@@ -266,6 +266,25 @@ def read_vehicle_state_by_id(vehicle_id: str):
     }
 
 
+def read_bus_lines():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT DISTINCT line_id
+        FROM vehicles
+        WHERE vehicle_type = 'bus'
+        AND line_id IS NOT NULL
+    """)
+
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return [r[0] for r in rows]
+
+
 #################################################################################################################
 
 def create_vehicle_event(events):
