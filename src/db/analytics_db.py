@@ -73,10 +73,10 @@ def get_congestion_hotspots(limit: int = 10):
             traffic_level,
             traffic_multiplier,
             weight,
-            timestamp
+            event_timestamp
         FROM traffic_events
         WHERE traffic_level = 'high'
-        ORDER BY timestamp DESC
+        ORDER BY event_timestamp DESC
         LIMIT %s
     """, (limit,))
 
@@ -92,7 +92,7 @@ def get_congestion_hotspots(limit: int = 10):
             "traffic_level": row[1],
             "traffic_multiplier": row[2],
             "weight": row[3],
-            "timestamp": row[4].isoformat() if row[4] else None,
+            "event_timestamp": row[4].isoformat() if row[4] else None,
         })
 
     return hotspots

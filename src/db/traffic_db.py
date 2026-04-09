@@ -54,9 +54,9 @@ def read_traffic():
             segment_id,
             traffic_level,
             traffic_multiplier,
-            updated_at
+            created_at
         FROM traffic_events
-        ORDER BY updated_at DESC
+        ORDER BY created_at DESC
     """)
 
     rows = cur.fetchall()
@@ -71,7 +71,7 @@ def read_traffic():
             "segment_id": r[0],
             "traffic_level": r[1],
             "traffic_multiplier": r[2],
-            "updated_at": r[3].isoformat() if r[3] else None,
+            "created_at": r[3].isoformat() if r[3] else None,
         })
 
     return traffic

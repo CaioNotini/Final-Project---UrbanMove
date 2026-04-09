@@ -89,6 +89,14 @@ def get_or_create_fleet(config: FleetConfig):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
     
+@router.get("/bus-lines")
+def get_bus_lines():
+    try:
+        lines = read_bus_lines()
+        return {"bus_lines": lines}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
 
 
     ################################################   GET Vehicles   #############################################################################
@@ -119,10 +127,3 @@ def get_vehicle(vehicle_id: str):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
     
-@router.get("/bus-lines")
-def get_bus_lines():
-    try:
-        lines = read_bus_lines()
-        return {"bus_lines": lines}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
