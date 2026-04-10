@@ -15,7 +15,7 @@ import streamlit as st
 # Runs against the existing FastAPI backend.
 # =========================
 
-API_URL = os.getenv("API_URL")
+API_URL = os.getenv("DASBOARD_URL")
 REQUEST_TIMEOUT = 15
 
 
