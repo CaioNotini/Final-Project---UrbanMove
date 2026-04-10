@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 import traceback
 
 from pydantic import BaseModel
+from src.api.auth_api import get_current_user, require_admin
 from src.db.grid_db import load_graph
 from src.simulator.run_sim import serialize_fleet, spawn_buses, spawn_cars
 from src.db.vehicle_db import (create_vehicle_event,create_vehicle_states,create_vehicles, read_bus_lines, read_vehicle_state_by_id, read_vehicle_states, read_vehicles, update_vehicle_current_state, create_reroute_event,)
@@ -18,7 +19,7 @@ class FleetConfig(BaseModel):
 ################################################   Events   #############################################################################
 
 @router.post("/events")
-def vehicle_events(events: list[dict]):
+def vehicle_events(events: list[dict], current_user=Depends(require_admin)):
     try:
         create_vehicle_event(events)
 
@@ -36,7 +37,7 @@ def vehicle_events(events: list[dict]):
 ################################################   Reroutes   #############################################################################
 
 @router.post("/reroutes")
-def reroute_events(events: list[dict]):
+def reroute_events(events: list[dict], current_user=Depends(require_admin)):
     try:
         create_reroute_event(events)
         return {"status": "ok", "count": len(events)}
@@ -49,7 +50,7 @@ def reroute_events(events: list[dict]):
 ################################################   Fleet   #############################################################################
 
 @router.post("/fleet")
-def get_or_create_fleet(config: FleetConfig):
+def get_or_create_fleet(config: FleetConfig, current_user=Depends(require_admin)):
     try:
         graph = load_graph()
 
@@ -90,7 +91,7 @@ def get_or_create_fleet(config: FleetConfig):
         raise HTTPException(status_code=500, detail=str(e))
     
 @router.get("/bus-lines")
-def get_bus_lines():
+def get_bus_lines(current_user=Depends(get_current_user)):
     try:
         lines = read_bus_lines()
         return {"bus_lines": lines}
@@ -102,7 +103,7 @@ def get_bus_lines():
     ################################################   GET Vehicles   #############################################################################
 
 @router.get("")
-def get_vehicles():
+def get_vehicles(current_user=Depends(get_current_user)):
     try:
         vehicles = read_vehicle_states()
         return {"vehicles": vehicles}
@@ -112,7 +113,7 @@ def get_vehicles():
     
 
 @router.get("/{vehicle_id}")
-def get_vehicle(vehicle_id: str):
+def get_vehicle(vehicle_id: str, current_user=Depends(get_current_user)):
     try:
         vehicle = read_vehicle_state_by_id(vehicle_id)
 

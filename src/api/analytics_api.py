@@ -1,13 +1,15 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 import traceback
 
-from src.db.analytics_db import (
-    get_stats_overview,
-    get_congestion_hotspots,
-    get_average_speed,
-)
+from src.api.auth_api import require_admin
+from src.db.analytics_db import get_stats_overview, get_congestion_hotspots, get_average_speed
 
-router = APIRouter(prefix="/analytics", tags=["analytics"])
+
+router = APIRouter(
+    prefix="/analytics",
+    tags=["analytics"],
+    dependencies=[Depends(require_admin)]
+)
 
 
 @router.get("/overview")

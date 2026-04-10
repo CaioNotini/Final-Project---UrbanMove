@@ -1,13 +1,14 @@
 import traceback
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from src.api.auth_api import get_current_user, require_admin
 from src.db.traffic_db import create_traffic_event, read_traffic
 
 router = APIRouter(prefix="/traffic", tags=["traffic"])
 
 
 @router.post("/events")
-def traffic_events(events: list[dict]):
+def traffic_events(events: list[dict], current_user=Depends(require_admin)):
     try:
         create_traffic_event(events)
         return {"status": "ok", "count": len(events)}
@@ -18,7 +19,7 @@ def traffic_events(events: list[dict]):
 
 
 @router.get("")
-def get_traffic():
+def get_traffic(current_user=Depends(get_current_user)):
     try:
         traffic = read_traffic()
         return {"traffic": traffic}
