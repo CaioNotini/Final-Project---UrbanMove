@@ -271,19 +271,41 @@ def read_bus_lines():
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT DISTINCT line_id
-        FROM vehicles
-        WHERE vehicle_type = 'bus'
-        AND line_id IS NOT NULL
+        SELECT
+            v.vehicle_id,
+            v.line_id,
+            vcs.route_stops,
+            vcs.current_target_stop,
+            vcs.current_node,
+            vcs.x,
+            vcs.y,
+            vcs.status
+        FROM vehicles v
+        JOIN vehicle_current_state vcs
+            ON v.vehicle_id = vcs.vehicle_id
+        WHERE v.vehicle_type = 'bus'
+          AND v.line_id IS NOT NULL
+        ORDER BY v.line_id, v.vehicle_id
     """)
 
     rows = cur.fetchall()
-
     cur.close()
     conn.close()
 
-    return [r[0] for r in rows]
+    result = []
+    for row in rows:
+        result.append({
+            "vehicle_id": row[0],
+            "line_id": row[1],
+            "route_stops": row[2],
+            "current_target_stop": row[3],
+            "current_node": row[4],
+            "x": row[5],
+            "y": row[6],
+            "status": row[7],
+        })
 
+    return result
 
 #################################################################################################################
 

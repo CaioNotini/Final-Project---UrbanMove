@@ -411,7 +411,7 @@ def page_route_and_admin() -> None:
             hotspots = safe_get("/analytics/congestion-hotspots")
             avg_speed = safe_get("/analytics/avg-speed")
             overview = safe_get("/analytics/overview")
-            reroutes_data = safe_get("/reroutes")
+            reroutes_data = safe_get("/vehicles/reroutes")
 
             hotspot_list = ensure_list(hotspots)
             reroutes = ensure_list(reroutes_data)
@@ -419,14 +419,20 @@ def page_route_and_admin() -> None:
             col1, col2 = st.columns(2)
             col1.metric("Congestion Hotspots", len(hotspot_list))
 
-            avg_speed_value = avg_speed
+            avg_speed_value = None
             if isinstance(avg_speed, dict):
                 avg_speed_value = (
-                    avg_speed.get("avg_speed")
+                    avg_speed.get("avg_speed_kmh")
+                    or avg_speed.get("avg_speed")
                     or avg_speed.get("average_speed")
-                    or str(avg_speed)
                 )
-            col2.metric("Average Speed", avg_speed_value if avg_speed_value is not None else "N/A")
+            elif isinstance(avg_speed, (int, float)):
+                avg_speed_value = avg_speed
+
+            if avg_speed_value is not None:
+                col2.metric("Average Speed", f"{avg_speed_value:.2f} km/h")
+            else:
+                col2.metric("Average Speed", "N/A")
 
             st.markdown("#### Overview stats")
             if isinstance(overview, dict):
