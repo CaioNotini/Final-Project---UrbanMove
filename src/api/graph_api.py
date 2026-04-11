@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from src.utils.logging_config import setup_logger
 
-from src.api.auth_api import require_admin
+#from src.api.auth_api import require_admin
 from src.db.grid_db import read_graph, load_graph, create_graph
 from src.simulator.grid import create_city_graph
 
