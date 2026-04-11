@@ -69,13 +69,14 @@ def get_headers() -> Dict[str, str]:
     return headers
 
 
-def handle_api_error(response: requests.Response) -> None:
+def handle_api_error(response: requests.Response, endpoint: str) -> None:
     try:
         payload = response.json()
         detail = payload.get("detail", response.text)
     except Exception:
         detail = response.text
-    st.error(f"Request failed ({response.status_code}): {detail}")
+
+    st.error(f"Endpoint {endpoint} failed ({response.status_code}): {detail}")
 
 
 def safe_get(endpoint: str) -> Optional[Any]:
@@ -87,10 +88,10 @@ def safe_get(endpoint: str) -> Optional[Any]:
         )
         if response.status_code == 200:
             return response.json()
-        handle_api_error(response)
+        handle_api_error(response, endpoint)
         return None
     except requests.RequestException as exc:
-        st.error(f"Could not reach backend: {exc}")
+        st.error(f"Could not reach backend endpoint {endpoint}: {exc}")
         return None
 
 
@@ -110,10 +111,10 @@ def safe_post(
         )
         if response.status_code in (200, 201):
             return response.json()
-        handle_api_error(response)
+        handle_api_error(response, endpoint)
         return None
     except requests.RequestException as exc:
-        st.error(f"Could not reach backend: {exc}")
+        st.error(f"Could not reach backend endpoint {endpoint}: {exc}")
         return None
 
 
@@ -370,10 +371,18 @@ def page_mobility_monitor() -> None:
         bus_lines = ensure_list(bus_lines_data)
 
         if bus_lines:
-            st.dataframe(bus_lines, use_container_width=True)
+            for line in bus_lines:
+                st.markdown(f"### Line {line.get('line_id')}")
+
+                if "route_stops" in line:
+                    st.write("Route stops:", line["route_stops"])
+
+                if "buses" in line:
+                    st.dataframe(line["buses"], use_container_width=True)
+                else:
+                    st.json(line)
         else:
             st.info("No bus line records available.")
-
 
 def page_route_and_admin() -> None:
     top_banner()
