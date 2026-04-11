@@ -1,9 +1,9 @@
-import traceback
-import jwt
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
+from src.utils.logging_config import setup_logger
+
+import jwt
 
 from src.db.auth_db import get_user_by_username, create_user
 from src.security.auth import (
@@ -15,6 +15,7 @@ from src.security.auth import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+logger = setup_logger("auth-api", "api.log")
 
 
 class RegisterRequest(BaseModel):
@@ -22,71 +23,26 @@ class RegisterRequest(BaseModel):
     password: str
 
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
-
-        if username is None:
-            raise credentials_exception
-
-    except jwt.PyJWTError:
-        raise credentials_exception
-
-    user = get_user_by_username(username)
-
-    if not user:
-        raise credentials_exception
-
-    if not user["is_active"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Inactive user"
-        )
-
-    return user
-
-
-def require_admin(current_user=Depends(get_current_user)):
-    if current_user["role"] != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required"
-        )
-    return current_user
-
-
 @router.post("/register")
 def register(payload: RegisterRequest):
+    logger.info("POST /auth/register | username=%s", payload.username)
+
     try:
         existing_user = get_user_by_username(payload.username)
 
         if existing_user:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Username already exists"
-            )
+            logger.warning("Register failed: user exists | %s", payload.username)
+            raise HTTPException(status_code=400, detail="Username already exists")
 
-        user = create_user(
-            username=payload.username,
-            password=payload.password,
-            role="user"
-        )
+        user = create_user(payload.username, payload.password, role="user")
 
-        access_token = create_access_token({
-            "sub": user["username"],
-            "role": user["role"]
-        })
+        token = create_access_token({"sub": user["username"], "role": user["role"]})
+
+        logger.info("User registered successfully | %s", payload.username)
 
         return {
             "message": "User created successfully",
-            "access_token": access_token,
+            "access_token": token,
             "token_type": "bearer",
             "role": user["role"],
             "username": user["username"]
@@ -94,43 +50,28 @@ def register(payload: RegisterRequest):
 
     except HTTPException:
         raise
-    except Exception as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("Register failed")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    logger.info("POST /auth/login | username=%s", form_data.username)
+
     try:
         user = get_user_by_username(form_data.username)
 
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid username or password",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        if not user or not verify_password(form_data.password, user["password_hash"]):
+            logger.warning("Login failed | username=%s", form_data.username)
+            raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        if not verify_password(form_data.password, user["password_hash"]):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid username or password",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        token = create_access_token({"sub": user["username"], "role": user["role"]})
 
-        if not user["is_active"]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Inactive user"
-            )
-
-        access_token = create_access_token({
-            "sub": user["username"],
-            "role": user["role"]
-        })
+        logger.info("Login success | username=%s", form_data.username)
 
         return {
-            "access_token": access_token,
+            "access_token": token,
             "token_type": "bearer",
             "role": user["role"],
             "username": user["username"]
@@ -138,25 +79,6 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
     except HTTPException:
         raise
-    except Exception as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/me")
-def read_me(current_user=Depends(get_current_user)):
-    return {
-        "id": current_user["id"],
-        "username": current_user["username"],
-        "role": current_user["role"],
-        "is_active": current_user["is_active"],
-        "created_at": current_user["created_at"]
-    }
-
-
-@router.get("/admin-test")
-def admin_test(current_user=Depends(require_admin)):
-    return {
-        "message": "Admin access granted",
-        "user": current_user["username"]
-    }
+    except Exception:
+        logger.exception("Login failed unexpectedly")
+        raise HTTPException(status_code=500, detail="Internal server error")
