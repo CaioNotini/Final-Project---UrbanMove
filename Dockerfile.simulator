@@ -11,4 +11,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# 👉 ADD THIS
+RUN mkdir -p /app/logs
+ENV LOG_DIR=/app/logs
+
 CMD ["python", "-m", "src.main"]
