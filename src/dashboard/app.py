@@ -366,7 +366,7 @@ def page_mobility_monitor() -> None:
             st.info("No traffic records available.")
 
     with tab3:
-        bus_lines_data = safe_get("/bus-lines")
+        bus_lines_data = safe_get("/vehicles/bus-lines")
         bus_lines = ensure_list(bus_lines_data)
 
         if bus_lines:
