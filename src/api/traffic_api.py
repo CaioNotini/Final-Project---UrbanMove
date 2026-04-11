@@ -10,7 +10,7 @@ logger = setup_logger("traffic-api", "api.log")
 
 
 @router.post("/events")
-def traffic_events(events: list[dict], current_user=Depends(require_admin)):
+def traffic_events(events: list[dict]):
     logger.info("POST /traffic/events called | events=%d", len(events))
 
     try:

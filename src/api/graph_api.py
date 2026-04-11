@@ -9,7 +9,6 @@ from src.simulator.grid import create_city_graph
 router = APIRouter(
     prefix="/graph",
     tags=["graph"],
-    dependencies=[Depends(require_admin)]
 )
 
 logger = setup_logger("graph-api", "api.log")

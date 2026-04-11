@@ -19,7 +19,7 @@ class FleetConfig(BaseModel):
 ################################################   Events   #############################################################################
 
 @router.post("/events")
-def vehicle_events(events: list[dict], current_user=Depends(require_admin)):
+def vehicle_events(events: list[dict]):
     try:
         create_vehicle_event(events)
 
@@ -37,7 +37,7 @@ def vehicle_events(events: list[dict], current_user=Depends(require_admin)):
 ################################################   Reroutes   #############################################################################
 
 @router.post("/reroutes")
-def reroute_events(events: list[dict], current_user=Depends(require_admin)):
+def reroute_events(events: list[dict]):
     try:
         create_reroute_event(events)
         return {"status": "ok", "count": len(events)}
@@ -50,7 +50,7 @@ def reroute_events(events: list[dict], current_user=Depends(require_admin)):
 ################################################   Fleet   #############################################################################
 
 @router.post("/fleet")
-def get_or_create_fleet(config: FleetConfig, current_user=Depends(require_admin)):
+def get_or_create_fleet(config: FleetConfig):
     try:
         graph = load_graph()
 
