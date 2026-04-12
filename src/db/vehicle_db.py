@@ -179,11 +179,12 @@ def read_vehicle_states():
             s.direction,
             s.updated_at
         FROM vehicles v
-        JOIN vehicle_current_state s
+        LEFT JOIN vehicle_current_state s
             ON v.vehicle_id = s.vehicle_id
         ORDER BY v.vehicle_id
     """)
 
+    columns = [desc[0] for desc in cur.description]
     rows = cur.fetchall()
 
     cur.close()
@@ -191,23 +192,34 @@ def read_vehicle_states():
 
     vehicles = []
 
-    for r in rows:
+    import json
+
+    for row in rows:
+        r = dict(zip(columns, row))
+
+        route_stops = r["route_stops"]
+        if isinstance(route_stops, str):
+            try:
+                route_stops = json.loads(route_stops)
+            except:
+                route_stops = []
+
         vehicles.append({
-            "vehicle_id": r[0],
-            "vehicle_type": r[1],
-            "line_id": r[2],
-            "current_node": r[3],
-            "segment_id": r[4],
-            "destination_node": r[5],
-            "status": r[6],
-            "x": r[7],
-            "y": r[8],
-            "speed_kmh": r[9],
-            "current_target_stop": r[10],
-            "route_stops": r[11],
-            "current_stop_index": r[12],
-            "direction": r[13],
-            "updated_at": r[14].isoformat() if r[14] else None,
+            "vehicle_id": r["vehicle_id"],
+            "vehicle_type": r["vehicle_type"],
+            "line_id": r["line_id"],
+            "current_node": r["current_node"],
+            "segment_id": r["segment_id"],
+            "destination_node": r["destination_node"],
+            "status": r["status"],
+            "x": r["x"],
+            "y": r["y"],
+            "speed_kmh": r["speed_kmh"],
+            "current_target_stop": r["current_target_stop"],
+            "route_stops": route_stops,
+            "current_stop_index": r["current_stop_index"],
+            "direction": r["direction"],
+            "updated_at": r["updated_at"].isoformat() if r["updated_at"] else None,
         })
 
     return vehicles

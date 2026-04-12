@@ -1,5 +1,8 @@
+import traceback
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from src.db.vehicle_db import read_bus_lines, read_vehicle_states
 from src.utils.logging_config import setup_logger
 
 from src.db.grid_db import read_graph, load_graph, create_graph
@@ -65,3 +68,57 @@ def get_or_create_graph(config: GraphConfig):
     except Exception:
         logger.exception("POST /graph failed")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.get("/state")
+def get_graph_state():
+    try:
+        if not read_graph():
+            raise HTTPException(status_code=404, detail="Graph not found")
+
+        graph = load_graph()
+
+        nodes = []
+        for node_id, data in graph.nodes(data=True):
+            nodes.append({
+                "node_id": node_id,
+                "x": data.get("x"),
+                "y": data.get("y"),
+            })
+
+        edges = []
+        for u, v, data in graph.edges(data=True):
+            edges.append({
+                "from_node": u,
+                "to_node": v,
+                "segment_id": data.get("segment_id"),
+                "traffic_level": data.get("traffic_level", "low"),
+                "weight": data.get("weight"),
+            })
+
+        vehicle_states = read_vehicle_states() or []
+        vehicles = []
+        for item in vehicle_states:
+            vehicles.append({
+                "vehicle_id": item.get("vehicle_id"),
+                "vehicle_type": item.get("vehicle_type"),
+                "x": item.get("x"),
+                "y": item.get("y"),
+                "current_node": item.get("current_node"),
+                "status": item.get("status"),
+                "line_id": item.get("line_id"),
+            })
+
+        bus_lines = read_bus_lines() or []
+
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "vehicles": vehicles,
+            "bus_lines": bus_lines,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))

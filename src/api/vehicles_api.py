@@ -4,6 +4,11 @@ import traceback
 from pydantic import BaseModel
 from src.api.auth_api import get_current_user, require_admin
 from src.db.grid_db import load_graph
+from src.db.grid_db import load_graph, read_graph
+from pydantic import BaseModel
+import networkx as nx
+from fastapi import HTTPException
+import traceback
 from src.simulator.run_sim import serialize_fleet, spawn_buses, spawn_cars
 from src.db.vehicle_db import (create_vehicle_event,create_vehicle_states,create_vehicles, read_bus_lines, read_vehicle_state_by_id, read_vehicle_states, read_vehicles, update_vehicle_current_state, create_reroute_event,)
 router = APIRouter(prefix="/vehicles", tags=["vehicles"])
@@ -13,6 +18,8 @@ class FleetConfig(BaseModel):
     num_cars: int
     num_buses: int
     algorithm: str = "astar"
+
+
 
 
 
@@ -128,3 +135,59 @@ def get_vehicle(vehicle_id: str):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
     
+
+    ################################################   POST Routes   #############################################################################
+
+class RouteRequest(BaseModel):
+    start_point: int
+    end_point: int
+    algorithm: str = "astar"
+
+@router.post("/recommend")
+def recommend_route(payload: RouteRequest):
+    try:
+        if not read_graph():
+            raise HTTPException(status_code=404, detail="Graph not found")
+
+        graph = load_graph()
+
+        if payload.start_point not in graph.nodes:
+            raise HTTPException(status_code=404, detail="Start point not found")
+
+        if payload.end_point not in graph.nodes:
+            raise HTTPException(status_code=404, detail="End point not found")
+
+        if payload.algorithm == "astar":
+            path_nodes = nx.astar_path(
+                graph,
+                payload.start_point,
+                payload.end_point,
+                heuristic=lambda a, b: abs(graph.nodes[a]["x"] - graph.nodes[b]["x"]) + abs(graph.nodes[a]["y"] - graph.nodes[b]["y"]),
+                weight="weight"
+            )
+        elif payload.algorithm == "dijkstra":
+            path_nodes = nx.dijkstra_path(
+                graph,
+                payload.start_point,
+                payload.end_point,
+                weight="weight"
+            )
+        else:
+            raise HTTPException(status_code=400, detail="Invalid algorithm")
+
+        total_weight = nx.path_weight(graph, path_nodes, weight="weight")
+        estimated_time_min = round(total_weight * 60, 2)
+
+        return {
+            "start_point": payload.start_point,
+            "end_point": payload.end_point,
+            "path": path_nodes,
+            "total_weight": total_weight,
+            "estimated_time_min": estimated_time_min
+        }
+
+    except nx.NetworkXNoPath:
+        raise HTTPException(status_code=404, detail="No path found")
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))

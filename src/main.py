@@ -1,14 +1,20 @@
 from __future__ import annotations
 
-import json
 import random
 import time
-import traceback
 
 from src.utils.logging_config import setup_logger
 
-from src.simulator.run_sim import *
-from src.db.vehicle_db import *
+from src.simulator.run_sim import (
+    parse_fleet,
+    update_traffic,
+    step_bus,
+    step_car,
+    emit_vehicle_update,
+    restart_path,
+    should_reroute_car,
+    reroute_car,
+)
 from src.api.api import (
     get_graph,
     get_or_create_fleet,
@@ -22,19 +28,19 @@ CARS = 6
 BUSES = 2
 NODES_X = 10
 NODES_Y = 10
-TICKS = 10
-TRAFIC_PROBABILITY = 0.02
 ALGORITHM = "astar"
+TICK_DELAY_SECONDS = 4
+RANDOM_SEED = 42
 
 # LOGGER
 logger = setup_logger("urbanmove-simulator", "simulator.log")
 
 
-def main():
-    logger.info("🚀 Simulator starting")
+def main() -> None:
+    logger.info("Simulator starting")
 
     try:
-        random.seed(42)
+        random.seed(RANDOM_SEED)
 
         width, height = NODES_X, NODES_Y
 
@@ -54,8 +60,11 @@ def main():
         logger.exception("❌ Failed during initialization")
         return
 
-    # ---------------- SIMULATION LOOP ----------------
-    for tick in range(TICKS):
+    # ---------------- CONTINUOUS SIMULATION LOOP ----------------
+    tick = 0
+
+    while True:
+        tick += 1
         logger.info("========== TICK %d ==========", tick)
 
         vehicle_events = []
@@ -66,12 +75,8 @@ def main():
             # ---------------- TRAFFIC ----------------
             try:
                 traffic_events = update_traffic(graph, cars, buses)
-
-                for te in traffic_events:
-                    traffic_events_to_send.append(te)
-
+                traffic_events_to_send.extend(traffic_events)
                 logger.info("Traffic updated: %d events", len(traffic_events))
-
             except Exception:
                 logger.exception("Error updating traffic")
 
@@ -79,23 +84,20 @@ def main():
             for b in buses:
                 try:
                     step_bus(graph, b, algorithm=ALGORITHM)
-
                     event = emit_vehicle_update(graph, b)
                     vehicle_events.append(event)
-
                 except Exception:
                     logger.exception("Error processing bus %s", b.vehicle_id)
 
             # ---------------- CARS ----------------
             for c in cars:
                 try:
-                    # PARKED LOGIC
+                    # parked cars wait before restarting
                     if c.status == "parked":
                         c.parked_tickets -= 1
 
                         if c.parked_tickets <= 0:
                             logger.info("Car %s restarting route", c.vehicle_id)
-
                             restart_path(graph, c, algorithm=ALGORITHM)
 
                             event = emit_vehicle_update(graph, c)
@@ -103,29 +105,32 @@ def main():
 
                         continue
 
-                    # REROUTE
+                    # reroute only when appropriate
                     if should_reroute_car(graph, c):
                         reroute_event = reroute_car(graph, c, algorithm=ALGORITHM)
-
                         if reroute_event:
                             reroute_events_to_send.append(reroute_event)
                             logger.info("Car %s rerouted", c.vehicle_id)
 
-                    # MOVE
+                    # move car
                     step_car(graph, c)
 
-                    # ARRIVAL
+                    # if arrived, park for a while before restarting
                     if c.arrived() and c.status != "parked":
                         c.status = "parked"
                         c.parked_tickets = random.randint(4, 9)
 
-                        logger.info("Car %s parked", c.vehicle_id)
+                        logger.info(
+                            "Car %s parked for %d ticks",
+                            c.vehicle_id,
+                            c.parked_tickets,
+                        )
 
                         event = emit_vehicle_update(graph, c)
                         vehicle_events.append(event)
                         continue
 
-                    # NORMAL UPDATE
+                    # normal update
                     event = emit_vehicle_update(graph, c)
                     vehicle_events.append(event)
 
@@ -157,9 +162,7 @@ def main():
         except Exception:
             logger.exception("❌ Fatal error in tick %d", tick)
 
-        time.sleep(2)  # delay between ticks
-
-    logger.info("Simulation finished.")
+        time.sleep(TICK_DELAY_SECONDS)
 
 
 if __name__ == "__main__":

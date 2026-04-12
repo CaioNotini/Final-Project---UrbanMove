@@ -1,6 +1,7 @@
 import os
 from typing import Any, Dict, List, Optional
 
+import plotly.graph_objects as go
 import requests
 import streamlit as st
 
@@ -158,7 +159,7 @@ def ensure_list(data: Any) -> List[Any]:
     if isinstance(data, list):
         return data
     if isinstance(data, dict):
-        for key in ("items", "data", "vehicles", "traffic", "hotspots", "reroutes"):
+        for key in ("items", "data", "vehicles", "traffic", "hotspots", "reroutes", "nodes", "edges", "bus_lines"):
             value = data.get(key)
             if isinstance(value, list):
                 return value
@@ -199,7 +200,7 @@ def sidebar_controls() -> str:
 
             page = st.radio(
                 "Navigation",
-                ["Overview", "Mobility Monitor", "Route & Admin"],
+                ["Overview", "Mobility Monitor", "Route & Admin", "Graph View"],
             )
 
             if st.button("Logout", use_container_width=True):
@@ -384,10 +385,11 @@ def page_mobility_monitor() -> None:
         else:
             st.info("No bus line records available.")
 
+
 def page_route_and_admin() -> None:
     top_banner()
     st.subheader("Route & Admin")
-    st.caption("Route recommendation plus admin operational analytics.")
+    st.caption("Route recommendation plus admin analytics.")
 
     left, right = st.columns([1.1, 1])
 
@@ -395,20 +397,39 @@ def page_route_and_admin() -> None:
         st.markdown("### Best route recommendation")
 
         with st.form("route_form"):
-            start = st.text_input("Start point / node", placeholder="Example: 4")
-            end = st.text_input("End point / node", placeholder="Example: 92")
+            start = st.number_input("Start point / node", min_value=0, step=1, value=0)
+            end = st.number_input("End point / node", min_value=0, step=1, value=1)
+            algorithm = st.selectbox("Algorithm", ["astar", "dijkstra"])
             submitted = st.form_submit_button("Recommend route", use_container_width=True)
 
         if submitted:
-            if not start or not end:
-                st.warning("Enter both start and end points.")
-            else:
-                result = safe_post(
-                    "/routes/recommend",
-                    json={"start": start, "end": end}
-                )
-                if result is not None:
-                    st.success("Route generated successfully.")
+            result = safe_post(
+                "/vehicles/recommend",
+                json={
+                    "start_point": int(start),
+                    "end_point": int(end),
+                    "algorithm": algorithm,
+                }
+            )
+            if result is not None:
+                st.success("Route generated successfully.")
+
+                col_a, col_b = st.columns(2)
+                col_a.metric("Total Weight", round(float(result.get("total_weight", 0)), 4))
+                col_b.metric("Estimated Time (min)", round(float(result.get("estimated_time_min", 0)), 2))
+
+                st.markdown("#### Route path")
+                st.write(result.get("path", []))
+
+                if result.get("path_coordinates"):
+                    st.markdown("#### Path coordinates")
+                    st.dataframe(result["path_coordinates"], use_container_width=True)
+
+                if result.get("segments"):
+                    st.markdown("#### Route segments")
+                    st.dataframe(result["segments"], use_container_width=True)
+
+                with st.expander("Full response"):
                     st.json(result)
 
     with right:
@@ -462,6 +483,141 @@ def page_route_and_admin() -> None:
                 st.info("No reroute endpoint data available yet.")
 
 
+def page_graph_view() -> None:
+    top_banner()
+    st.subheader("Graph View")
+    st.caption("Live view of the road network, vehicles, traffic zones, and bus lines.")
+
+    if st.button("Refresh graph"):
+        st.rerun()
+
+    graph_data = safe_get("/graph/state")
+    if not graph_data:
+        st.info("Graph state not available.")
+        return
+
+    nodes = ensure_list(graph_data.get("nodes"))
+    edges = ensure_list(graph_data.get("edges"))
+    vehicles = ensure_list(graph_data.get("vehicles"))
+    bus_lines = ensure_list(graph_data.get("bus_lines"))
+
+    if not nodes:
+        st.warning("No graph nodes available.")
+        return
+
+    node_lookup = {n["node_id"]: n for n in nodes if "node_id" in n}
+
+    fig = go.Figure()
+
+    traffic_color_map = {
+        "low": "green",
+        "medium": "orange",
+        "high": "red",
+    }
+
+    for edge in edges:
+        from_node = node_lookup.get(edge.get("from_node"))
+        to_node = node_lookup.get(edge.get("to_node"))
+
+        if not from_node or not to_node:
+            continue
+
+        color = traffic_color_map.get(
+            str(edge.get("traffic_level", "low")).lower(),
+            "gray",
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=[from_node["x"], to_node["x"]],
+                y=[from_node["y"], to_node["y"]],
+                mode="lines",
+                line=dict(width=2, color=color),
+                hoverinfo="text",
+                text=(
+                    f"Segment: {edge.get('segment_id')}<br>"
+                    f"Traffic: {edge.get('traffic_level')}<br>"
+                    f"Weight: {edge.get('weight')}"
+                ),
+                showlegend=False,
+            )
+        )
+
+    fig.add_trace(
+        go.Scatter(
+            x=[n["x"] for n in nodes],
+            y=[n["y"] for n in nodes],
+            mode="markers",
+            marker=dict(size=6, color="lightblue"),
+            text=[f"Node {n['node_id']}" for n in nodes],
+            name="Nodes",
+        )
+    )
+
+    cars = [v for v in vehicles if str(v.get("vehicle_type", "")).lower() == "car"]
+    if cars:
+        fig.add_trace(
+            go.Scatter(
+                x=[v["x"] for v in cars if v.get("x") is not None],
+                y=[v["y"] for v in cars if v.get("y") is not None],
+                mode="markers",
+                marker=dict(size=10, color="blue", symbol="circle"),
+                text=[
+                    f"Car: {v.get('vehicle_id')}<br>"
+                    f"Status: {v.get('status')}<br>"
+                    f"Node: {v.get('current_node')}"
+                    for v in cars if v.get("x") is not None and v.get("y") is not None
+                ],
+                name="Cars",
+            )
+        )
+
+    buses = [v for v in vehicles if str(v.get("vehicle_type", "")).lower() == "bus"]
+    if buses:
+        fig.add_trace(
+            go.Scatter(
+                x=[v["x"] for v in buses if v.get("x") is not None],
+                y=[v["y"] for v in buses if v.get("y") is not None],
+                mode="markers",
+                marker=dict(size=12, color="yellow", symbol="square"),
+                text=[
+                    f"Bus: {v.get('vehicle_id')}<br>"
+                    f"Line: {v.get('line_id')}<br>"
+                    f"Status: {v.get('status')}<br>"
+                    f"Node: {v.get('current_node')}"
+                    for v in buses if v.get("x") is not None and v.get("y") is not None
+                ],
+                name="Buses",
+            )
+        )
+
+    fig.update_layout(
+        height=700,
+        xaxis_title="X",
+        yaxis_title="Y",
+        yaxis=dict(scaleanchor="x", scaleratio=1),
+        margin=dict(l=20, r=20, t=20, b=20),
+        legend=dict(orientation="h"),
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    a, b, c, d = st.columns(4)
+    a.metric("Nodes", len(nodes))
+    b.metric("Edges", len(edges))
+    c.metric("Vehicles", len(vehicles))
+    d.metric("Bus Lines", len(bus_lines))
+
+    with st.expander("Bus lines details"):
+        if bus_lines:
+            st.dataframe(bus_lines, use_container_width=True)
+        else:
+            st.info("No bus line data available.")
+
+    with st.expander("Raw graph state"):
+        st.json(graph_data)
+
+
 def main() -> None:
     page = sidebar_controls()
 
@@ -475,6 +631,8 @@ def main() -> None:
         page_mobility_monitor()
     elif page == "Route & Admin":
         page_route_and_admin()
+    elif page == "Graph View":
+        page_graph_view()
 
 
 if __name__ == "__main__":

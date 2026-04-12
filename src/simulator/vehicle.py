@@ -57,12 +57,11 @@ class Bus(Vehicle):
         if next_index >= len(self.route_stops):
             self.direction = -1
             next_index = self.current_stop_index + self.direction
-
         elif next_index < 0:
             self.direction = 1
             next_index = self.current_stop_index + self.direction
 
         self.current_stop_index = next_index
-        
+
     def arrived(self) -> bool:
         return self.reached_stop()

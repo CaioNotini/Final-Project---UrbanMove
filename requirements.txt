@@ -13,3 +13,4 @@ requests
 
 PyJWT==2.10.1
 python-multipart
+plotly

@@ -146,6 +146,8 @@ def spawn_buses(
                 line_id=f"L{i:02d}",
                 direction=1,
                 vehicle_type="bus",
+                remaining_ticks=0,
+                next_node=None,
             )
 
             buses.append(bus)
@@ -263,7 +265,7 @@ def parse_fleet(data):
 ################################################   Moving Vehicles   #############################################################################
 
 
-def segment_travel_ticks(edge_data: dict, vehicle_speed_kmh: float, tick_minutes: float = 1.0) -> int:
+def segment_travel_ticks(edge_data: dict, vehicle_speed_kmh: float, tick_minutes: float = 0.25) -> int:
     length_km = edge_data["length_km"]
     speed_limit_kmh = edge_data["speed_limit_kmh"]
     traffic_multiplier = edge_data.get("traffic_multiplier", 1.0)
@@ -292,7 +294,19 @@ def segment_travel_ticks(edge_data: dict, vehicle_speed_kmh: float, tick_minutes
     return ticks
 
 
-def step_car(graph, car):
+def _complete_vehicle_segment(vehicle, next_status_if_not_arrived="moving"):
+    vehicle.current_node = vehicle.next_node
+    vehicle.path_index += 1
+    vehicle.next_node = None
+
+    if vehicle.arrived():
+        vehicle.status = "arrived"
+        vehicle.current_segment_id = None
+    else:
+        vehicle.status = next_status_if_not_arrived
+
+
+def step_car(graph: nx.DiGraph, car: Car) -> None:
     try:
         if car.arrived():
             logger.info(
@@ -301,6 +315,8 @@ def step_car(graph, car):
                 car.current_node,
                 car.destination_node,
             )
+            car.status = "arrived"
+            car.current_segment_id = None
             return
 
         if car.remaining_ticks > 0:
@@ -313,20 +329,15 @@ def step_car(graph, car):
             )
 
             if car.remaining_ticks == 0 and car.next_node is not None:
-                car.current_node = car.next_node
-                car.path_index += 1
-                car.next_node = None
+                _complete_vehicle_segment(car)
 
                 if car.arrived():
-                    car.status = "arrived"
-                    car.current_segment_id = None
                     logger.info(
                         "Car %s arrived at destination %s",
                         car.vehicle_id,
                         car.destination_node,
                     )
                 else:
-                    car.status = "moving"
                     logger.info(
                         "Car %s reached node %s | path_index=%d",
                         car.vehicle_id,
@@ -357,7 +368,7 @@ def step_car(graph, car):
         car.status = "moving"
 
         travel_ticks = segment_travel_ticks(edge_data, car.speed_kmh)
-        car.remaining_ticks = travel_ticks - 1
+        car.remaining_ticks = max(0, travel_ticks - 1)
 
         logger.info(
             "Car %s started segment %s | from=%s | to=%s | travel_ticks=%d",
@@ -369,13 +380,9 @@ def step_car(graph, car):
         )
 
         if travel_ticks == 1:
-            car.current_node = next_node
-            car.path_index += 1
-            car.next_node = None
+            _complete_vehicle_segment(car)
 
             if car.arrived():
-                car.status = "arrived"
-                car.current_segment_id = None
                 logger.info(
                     "Car %s arrived immediately at destination %s",
                     car.vehicle_id,
@@ -395,7 +402,7 @@ def step_bus(graph: nx.DiGraph, bus: Bus, algorithm: str = "astar") -> None:
             logger.warning("Bus %s has empty path_nodes", bus.vehicle_id)
             return
 
-        if bus.reached_stop():
+        if bus.reached_stop() and bus.remaining_ticks == 0 and bus.next_node is None:
             logger.info(
                 "Bus %s reached stop %s | line=%s",
                 bus.vehicle_id,
@@ -417,7 +424,30 @@ def step_bus(graph: nx.DiGraph, bus: Bus, algorithm: str = "astar") -> None:
             bus.path_nodes = best_path(graph, bus.current_node, next_stop, alg=algorithm)
             bus.path_index = 0
             bus.current_segment_id = None
+            bus.next_node = None
+            bus.remaining_ticks = 0
             bus.status = "stopped"
+            return
+
+        if bus.remaining_ticks > 0:
+            bus.remaining_ticks -= 1
+            logger.info(
+                "Bus %s progressing on segment %s | remaining_ticks=%d",
+                bus.vehicle_id,
+                bus.current_segment_id,
+                bus.remaining_ticks,
+            )
+
+            if bus.remaining_ticks == 0 and bus.next_node is not None:
+                _complete_vehicle_segment(bus)
+
+                logger.info(
+                    "Bus %s reached node %s | line=%s | path_index=%d",
+                    bus.vehicle_id,
+                    bus.current_node,
+                    bus.line_id,
+                    bus.path_index,
+                )
             return
 
         if bus.path_index >= len(bus.path_nodes) - 1:
@@ -431,7 +461,6 @@ def step_bus(graph: nx.DiGraph, bus: Bus, algorithm: str = "astar") -> None:
             )
             return
 
-        bus.status = "moving"
         next_node = bus.path_nodes[bus.path_index + 1]
         edge_data = graph.get_edge_data(bus.current_node, next_node)
 
@@ -439,17 +468,31 @@ def step_bus(graph: nx.DiGraph, bus: Bus, algorithm: str = "astar") -> None:
             raise ValueError(f"No edge from {bus.current_node} to {next_node}")
 
         bus.current_segment_id = edge_data["segment_id"]
-        bus.current_node = next_node
-        bus.path_index += 1
+        bus.next_node = next_node
+        bus.status = "moving"
+
+        travel_ticks = segment_travel_ticks(edge_data, bus.speed_kmh)
+        bus.remaining_ticks = max(0, travel_ticks - 1)
 
         logger.info(
-            "Bus %s moved | line=%s | current_node=%s | next_target_stop=%s | segment=%s",
+            "Bus %s started segment %s | from=%s | to=%s | travel_ticks=%d",
             bus.vehicle_id,
-            bus.line_id,
-            bus.current_node,
-            bus.current_target_stop(),
             bus.current_segment_id,
+            bus.current_node,
+            next_node,
+            travel_ticks,
         )
+
+        if travel_ticks == 1:
+            _complete_vehicle_segment(bus)
+
+            logger.info(
+                "Bus %s moved immediately | line=%s | current_node=%s | segment=%s",
+                bus.vehicle_id,
+                bus.line_id,
+                bus.current_node,
+                bus.current_segment_id,
+            )
 
     except Exception:
         logger.exception("Error in step_bus for %s", bus.vehicle_id)
@@ -471,6 +514,7 @@ def emit_vehicle_update(graph: nx.DiGraph, v) -> dict:
             "current_node": v.current_node,
             "status": v.status,
             "speed_kmh": v.speed_kmh,
+            "segment_id": v.current_segment_id,
         }
 
         if v.vehicle_type == "car":
@@ -482,7 +526,6 @@ def emit_vehicle_update(graph: nx.DiGraph, v) -> dict:
             event["current_stop_index"] = v.current_stop_index
             event["direction"] = v.direction
             event["line_id"] = v.line_id
-            event["segment_id"] = v.current_segment_id
 
         return event
 
@@ -491,7 +534,7 @@ def emit_vehicle_update(graph: nx.DiGraph, v) -> dict:
         raise
 
 
-def restart_path(graph, car, algorithm="astar"):
+def restart_path(graph: nx.DiGraph, car: Car, algorithm: str = "astar") -> None:
     try:
         old_destination = car.destination_node
         new_dest = random.choice([n for n in graph.nodes() if n != car.current_node])
