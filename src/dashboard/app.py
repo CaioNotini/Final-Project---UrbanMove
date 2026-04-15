@@ -441,10 +441,10 @@ def page_route_and_admin() -> None:
             hotspots = safe_get("/analytics/congestion-hotspots")
             avg_speed = safe_get("/analytics/avg-speed")
             overview = safe_get("/analytics/overview")
-            reroutes_data = safe_get("/vehicles/reroutes")
+            #reroutes_data = safe_get("/vehicles/reroutes")
 
             hotspot_list = ensure_list(hotspots)
-            reroutes = ensure_list(reroutes_data)
+            #reroutes = ensure_list(reroutes_data)
 
             col1, col2 = st.columns(2)
             col1.metric("Congestion Hotspots", len(hotspot_list))
@@ -476,11 +476,11 @@ def page_route_and_admin() -> None:
             else:
                 st.info("No hotspot data available.")
 
-            st.markdown("#### Reroutes")
-            if reroutes:
-                st.dataframe(reroutes, use_container_width=True)
-            else:
-                st.info("No reroute endpoint data available yet.")
+            #st.markdown("#### Reroutes")
+            #if reroutes:
+            #    st.dataframe(reroutes, use_container_width=True)
+           # else:
+            #    st.info("No reroute endpoint data available yet.")
 
 
 def page_graph_view() -> None:

@@ -55,7 +55,7 @@ UrbanMove follows a distributed cloud architecture deployed on AWS.
 -   urbanmove-api\
 -   urbanmove-simulator
 
-#### 2. SSH Access
+#### 2. SSH Access (One terminal for instance)
 
 ```bash
 ssh -i key.pem ubuntu@<API_IP>
@@ -63,7 +63,15 @@ ssh -i key.pem ubuntu@<API_IP>
 ssh -i key.pem ubuntu@<SIM_IP>
 ```
 
-#### 3. Run API
+#### 3. Enter the project space
+
+```bash
+cd Final-Project---UrbanMove
+
+source .venv/bin/activate
+```
+
+#### 4. Run API
 
 ```bash
 docker build -t urbanmove-api .
@@ -71,7 +79,7 @@ docker build -t urbanmove-api .
 docker run -d -p 8000:8000 --env-file .env urbanmove-api
 ```
 
-#### 4. Run Simulator
+#### 5. Run Simulator
 
 ```bash
 python3 -m venv .venv
@@ -83,12 +91,6 @@ pip install -r requirements.txt
 python -m src.main
 ```
 
-#### 5. Initialize System
-
-```bash
-curl -X POST http://<API_IP>:8000/graph/load
-```
-
 #### 6. Test API
 
 Open:
@@ -98,7 +100,7 @@ http://`<API_IP>`{=html}:8000/health
 #### 7. Open dahsboard
 
 ```bash
-streamlit run dashboard.py
+streamlit run src/dashboard/app.py --server.address 0.0.0.0 --server.port 8501
 ```
 
 ---
